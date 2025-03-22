@@ -1,0 +1,58 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Definir el enumerador para los tipos de usuario
+enum TipoUsuario {
+  ADMINISTRADOR
+  CLIENTE
+  TECNICO
+  OTRO
+}
+
+model usuarios {
+  id          Int         @id @default(autoincrement())
+  nombre      String
+  apellido    String
+  email       String      @unique
+  contraseña  String
+  activo      Boolean     @default(true)
+  telefono    String?
+  tipo        TipoUsuario // Usa el enum definido
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+}
+
+model Producto {
+  id          Int      @id @default(autoincrement())
+  nombre      String
+  descripcion String
+  precio      Float
+  stock       Int
+  categoria   String
+  activo      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  imagenes    Imagen[]
+  @@map("producto")
+}
+
+model Imagen {
+  id         Int      @id @default(autoincrement())
+  url        String
+  producto   Producto @relation(fields: [productoId], references: [id], onDelete: Cascade)
+  productoId Int
+  createdAt  DateTime @default(now())
+  @@map("imagen")
+}
