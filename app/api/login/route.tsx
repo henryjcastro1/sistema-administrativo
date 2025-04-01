@@ -10,7 +10,7 @@ export async function POST(request: Request) {
     const { email, contraseña } = await request.json();
 
     // Buscar el usuario por email
-    const usuario = await prisma.usuarios.findUnique({
+    const usuario = await prisma.usuario.findUnique({
       where: { email },
     });
 

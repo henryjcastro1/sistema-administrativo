@@ -1,9 +1,6 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -13,7 +10,7 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// Definir el enumerador para los tipos de usuario
+// Enumeradores
 enum TipoUsuario {
   ADMINISTRADOR
   CLIENTE
@@ -21,7 +18,21 @@ enum TipoUsuario {
   OTRO
 }
 
-model usuarios {
+enum CategoriaNombre {
+  ELECTRONICA
+  ROPA
+  HOGAR
+  DEPORTES
+}
+
+enum EstadoVenta {
+  PENDIENTE
+  COMPLETADA
+  CANCELADA
+}
+
+// Modelos
+model Usuario {
   id          Int         @id @default(autoincrement())
   nombre      String
   apellido    String
@@ -29,30 +40,76 @@ model usuarios {
   contraseña  String
   activo      Boolean     @default(true)
   telefono    String?
-  tipo        TipoUsuario // Usa el enum definido
+  tipo        TipoUsuario
+  ventas      Venta[]     @relation("VentasUsuario")
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
+
+  @@map("usuarios")
+}
+
+model Categoria {
+  id          Int             @id @default(autoincrement())
+  nombre      CategoriaNombre @unique
+  descripcion String?
+  productos   Producto[]      @relation("ProductosCategoria")
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@map("categorias")
 }
 
 model Producto {
-  id          Int      @id @default(autoincrement())
+  id          Int         @id @default(autoincrement())
   nombre      String
   descripcion String
   precio      Float
   stock       Int
-  categoria   String
-  activo      Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  imagenes    Imagen[]
-  @@map("producto")
+  categoria   Categoria   @relation("ProductosCategoria", fields: [categoriaId], references: [id])
+  categoriaId Int
+  activo      Boolean     @default(true)
+  imagenes    Imagen[]    @relation("ImagenesProducto")
+  itemsVenta  ItemVenta[] @relation("ItemsProducto")
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@map("productos")
 }
 
 model Imagen {
-  id         Int      @id @default(autoincrement())
+  id         Int       @id @default(autoincrement())
   url        String
-  producto   Producto @relation(fields: [productoId], references: [id], onDelete: Cascade)
+  producto   Producto  @relation("ImagenesProducto", fields: [productoId], references: [id], onDelete: Cascade)
   productoId Int
-  createdAt  DateTime @default(now())
-  @@map("imagen")
+  createdAt  DateTime  @default(now())
+
+  @@map("imagenes")
+}
+
+model Venta {
+  id        Int         @id @default(autoincrement())
+  cliente   Usuario     @relation("VentasUsuario", fields: [clienteId], references: [id])
+  clienteId Int
+  items     ItemVenta[] @relation("ItemsVenta")
+  total     Float
+  estado    EstadoVenta @default(PENDIENTE)
+  fecha     DateTime    @default(now())
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  @@map("ventas")
+}
+
+model ItemVenta {
+  id             Int       @id @default(autoincrement())
+  venta          Venta     @relation("ItemsVenta", fields: [ventaId], references: [id], onDelete: Cascade)
+  ventaId        Int
+  producto       Producto  @relation("ItemsProducto", fields: [productoId], references: [id])
+  productoId     Int
+  cantidad       Int
+  precioUnitario Float
+  subtotal       Float
+  createdAt      DateTime  @default(now())
+
+  @@map("items_venta")
 }

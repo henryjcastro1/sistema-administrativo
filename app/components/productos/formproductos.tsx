@@ -7,9 +7,17 @@ interface ProductoFormData {
   descripcion: string;
   precio: string;
   stock: string;
-  categoria: string;
+  categoria: CategoriaNombre; // Cambiado a tipo enum
   activo: boolean;
   imagenes: File[];
+}
+
+// Definir el enum para las categorías
+enum CategoriaNombre {
+  ELECTRONICA = "ELECTRONICA",
+  ROPA = "ROPA",
+  HOGAR = "HOGAR",
+  DEPORTES = "DEPORTES"
 }
 
 const FormProducto = () => {
@@ -18,7 +26,7 @@ const FormProducto = () => {
     descripcion: "",
     precio: "",
     stock: "",
-    categoria: "",
+    categoria: CategoriaNombre.ELECTRONICA, // Valor por defecto
     activo: true,
     imagenes: []
   });
@@ -35,12 +43,19 @@ const FormProducto = () => {
   const handleImageChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       const files = Array.from(e.target.files);
+      const MAX_IMAGES = 5;
+      
+      if (formData.imagenes.length + files.length > MAX_IMAGES) {
+        alert(`Solo puedes subir hasta ${MAX_IMAGES} imágenes`);
+        return;
+      }
+  
       setFormData(prev => ({
         ...prev,
         imagenes: [...prev.imagenes, ...files]
       }));
     }
-  }, []);
+  }, [formData.imagenes.length]);
 
   const removeImage = useCallback((index: number) => {
     setFormData(prev => ({
@@ -76,12 +91,12 @@ const FormProducto = () => {
       formDataToSend.append("activo", String(formData.activo));
       
       formData.imagenes.forEach((file) => {
-        formDataToSend.append(`imagenes`, file);
+        formDataToSend.append("imagenes", file); // Asegúrate de que el nombre coincida con lo esperado en el backend
       });
 
       const response = await fetch("/api/productos", {
         method: "POST",
-        body: formDataToSend
+        body: formDataToSend // No necesitas headers para FormData
       });
 
       if (response.ok) {
@@ -91,18 +106,21 @@ const FormProducto = () => {
           descripcion: "",
           precio: "",
           stock: "",
-          categoria: "",
+          categoria: CategoriaNombre.ELECTRONICA,
           activo: true,
           imagenes: []
         });
         setTimeout(() => setShowForm(false), 2000);
       } else {
         setSubmitStatus("error");
-        console.error("Error:", await response.json());
+        const errorData = await response.json();
+        console.error("Error del servidor:", errorData);
+        alert(`Error al guardar: ${errorData.message || "Error desconocido"}`);
       }
     } catch (error) {
       setSubmitStatus("error");
       console.error("Error al agregar producto:", error);
+      alert("Error de conexión al servidor");
     } finally {
       setIsSubmitting(false);
     }
@@ -148,6 +166,7 @@ const FormProducto = () => {
                     onChange={handleChange}
                     className="mt-1 block w-full px-3 py-2 border rounded-md"
                     step="0.01"
+                    min="0"
                     required
                   />
                 </label>
@@ -162,6 +181,7 @@ const FormProducto = () => {
                     value={formData.stock}
                     onChange={handleChange}
                     className="mt-1 block w-full px-3 py-2 border rounded-md"
+                    min="0"
                     required
                   />
                 </label>
@@ -170,14 +190,18 @@ const FormProducto = () => {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Categoría *
-                  <input
-                    type="text"
+                  <select
                     name="categoria"
                     value={formData.categoria}
                     onChange={handleChange}
                     className="mt-1 block w-full px-3 py-2 border rounded-md"
                     required
-                  />
+                  >
+                    <option value={CategoriaNombre.ELECTRONICA}>Electrónica</option>
+                    <option value={CategoriaNombre.ROPA}>Ropa</option>
+                    <option value={CategoriaNombre.HOGAR}>Hogar</option>
+                    <option value={CategoriaNombre.DEPORTES}>Deportes</option>
+                  </select>
                 </label>
               </div>
 
@@ -195,7 +219,7 @@ const FormProducto = () => {
 
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Imágenes
+                  Imágenes (Máximo 5)
                   <input
                     type="file"
                     multiple

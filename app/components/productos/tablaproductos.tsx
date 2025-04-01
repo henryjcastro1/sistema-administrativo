@@ -1,28 +1,64 @@
 'use client';
 import { useEffect, useState } from "react";
-import { FiSearch, FiTrash2, FiEdit, FiImage } from "react-icons/fi";
+import { FiSearch, FiTrash2, FiEdit, FiImage, FiPlus, FiX } from "react-icons/fi";
 import Image from "next/image";
-import React from 'react';
 
+// Definimos el tipo para Categoria
+type Categoria = {
+  id: number;
+  nombre: string;
+  descripcion?: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+// Tipo para las imágenes
+type ProductoImagen = {
+  url: string;
+  id?: number;
+};
+
+// Tipo completo para Producto (basado en tu API)
 type Producto = {
   id: number;
   nombre: string;
   descripcion: string;
   precio: number;
   stock: number;
-  categoria: string;
+  categoria: Categoria;
   activo: boolean;
-  imagenes: { url: string }[];
+  imagenes: ProductoImagen[];
+  createdAt?: string;
+  updatedAt?: string;
 };
 
+type ProductosAPIResponse = Producto[];
+
+
 const formatPrecio = (precio: number): string => {
-  return precio.toLocaleString('es-ES'); // Formato español con separadores de miles
+  return precio.toLocaleString('es-ES');
 };
 
 export default function Tablaproducts() {
   const [productos, setProductos] = useState<Producto[]>([]);
   const [search, setSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [editingImages, setEditingImages] = useState<{
+    productoId: number | null;
+    productoNombre: string;
+    imagenes: File[];
+    previews: string[];
+    existingImages: { url: string; id?: number }[];
+  }>({
+    productoId: null,
+    productoNombre: "",
+    imagenes: [],
+    previews: [],
+    existingImages: []
+  });
+  
+  const [isImageModalOpen, setIsImageModalOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const itemsPerPage = 10;
 
   useEffect(() => {
@@ -30,10 +66,23 @@ export default function Tablaproducts() {
       try {
         const response = await fetch("/api/productos");
         if (!response.ok) throw new Error("Error al cargar productos");
-        const data: Producto[] = await response.json();
-        setProductos(data);
+        
+        const data: ProductosAPIResponse = await response.json();
+        
+        // Transformamos los datos para asegurar que categoria sea un objeto
+        const productosTransformados = data.map((producto) => ({
+          ...producto,
+          categoria: producto.categoria || { id: 0, nombre: 'Sin categoría' }
+        }));
+        
+        setProductos(productosTransformados);
       } catch (error) {
         console.error(error);
+        if (error instanceof Error) {
+          console.error("Detalles del error:", error.message);
+        }
+      } finally {
+        setIsLoading(false);
       }
     };
     fetchProductos();
@@ -42,7 +91,7 @@ export default function Tablaproducts() {
   const filteredProductos = productos.filter(
     (producto) =>
       producto.nombre.toLowerCase().includes(search.toLowerCase()) ||
-      producto.categoria.toLowerCase().includes(search.toLowerCase()) ||
+      producto.categoria.nombre.toLowerCase().includes(search.toLowerCase()) ||
       producto.descripcion.toLowerCase().includes(search.toLowerCase())
   );
 
@@ -106,6 +155,90 @@ export default function Tablaproducts() {
     }
   };
 
+  const openImageEditor = (producto: Producto) => {
+    setEditingImages({
+      productoId: producto.id,
+      productoNombre: producto.nombre,
+      imagenes: [],
+      previews: [],
+      existingImages: [...producto.imagenes]
+    });
+    setIsImageModalOpen(true);
+  };
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const newFiles = Array.from(e.target.files);
+      const newPreviews = newFiles.map(file => URL.createObjectURL(file));
+      
+      setEditingImages(prev => ({
+        ...prev,
+        imagenes: [...prev.imagenes, ...newFiles],
+        previews: [...prev.previews, ...newPreviews],
+      }));
+    }
+  };
+
+  const removeImage = (index: number, isExisting: boolean) => {
+    setEditingImages(prev => {
+      if (isExisting) {
+        const newExisting = [...prev.existingImages];
+        newExisting.splice(index, 1);
+        return { ...prev, existingImages: newExisting };
+      } else {
+        const newImagenes = [...prev.imagenes];
+        const newPreviews = [...prev.previews];
+        newImagenes.splice(index, 1);
+        newPreviews.splice(index, 1);
+        return { ...prev, imagenes: newImagenes, previews: newPreviews };
+      }
+    });
+  };
+
+  const saveImages = async () => {
+    if (!editingImages.productoId) return;
+
+    try {
+      const formData = new FormData();
+      formData.append("productoId", editingImages.productoId.toString());
+      
+      editingImages.imagenes.forEach(file => {
+        formData.append("imagenes", file);
+      });
+
+      editingImages.existingImages.forEach(img => {
+        if (img.id) {
+          formData.append("keepImageIds", img.id.toString());
+        }
+      });
+
+      const response = await fetch("/api/imagenes", {
+        method: "PUT",
+        body: formData,
+      });
+
+      if (response.ok) {
+        const updatedProducto = await response.json();
+        setProductos(prev =>
+          prev.map(p =>
+            p.id === updatedProducto.id ? updatedProducto : p
+          )
+        );
+        setIsImageModalOpen(false);
+      }
+    } catch (error) {
+      console.error("Error al actualizar imágenes:", error);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="p-6 flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-6">
       <h1 className="text-2xl font-bold mb-4 text-gray-800">Catálogo de Productos</h1>
@@ -139,7 +272,10 @@ export default function Tablaproducts() {
           <tbody className="divide-y divide-gray-200">
             {currentProductos.map((producto) => (
               <tr key={producto.id} className="hover:bg-gray-100">
-                <td className="p-3">
+                <td 
+                  className="p-3 cursor-pointer hover:bg-gray-50"
+                  onClick={() => openImageEditor(producto)}
+                >
                   {producto.imagenes.length > 0 ? (
                     <Image
                       src={producto.imagenes[0].url}
@@ -149,13 +285,15 @@ export default function Tablaproducts() {
                       className="object-cover rounded"
                     />
                   ) : (
-                    <FiImage className="text-gray-400 text-xl" />
+                    <div className="flex items-center justify-center w-12 h-12 bg-gray-100 rounded">
+                      <FiImage className="text-gray-400 text-xl" />
+                    </div>
                   )}
                 </td>
                 <td className="p-3 font-medium">{producto.nombre}</td>
                 <td className="p-3">${formatPrecio(producto.precio)}</td>
                 <td className="p-3">{producto.stock}</td>
-                <td className="p-3">{producto.categoria}</td>
+                <td className="p-3">{producto.categoria.nombre}</td>
                 <td className="p-3">
                   <span
                     className={`px-3 py-1 rounded-full text-white ${
@@ -208,6 +346,95 @@ export default function Tablaproducts() {
           </button>
         </div>
       </div>
+
+      {/* Modal para editar imágenes */}
+      {isImageModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white p-6 rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold">Editar Imágenes de {editingImages.productoNombre}</h2>
+              <button 
+                onClick={() => setIsImageModalOpen(false)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <FiX size={24} />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 mb-6">
+              {/* Imágenes existentes */}
+              {editingImages.existingImages.map((img, index) => (
+                <div key={`existing-${index}`} className="relative group">
+                  <Image
+                    src={img.url}
+                    alt={`Imagen existente ${index}`}
+                    width={150}
+                    height={150}
+                    className="h-32 w-full object-cover rounded-lg"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeImage(index, true)}
+                    className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+
+              {/* Nuevas imágenes (previews) */}
+              {editingImages.previews.map((preview, index) => (
+                <div key={`new-${index}`} className="relative group">
+                  <Image
+                    src={preview}
+                    alt={`Nueva imagen ${index}`}
+                    width={150}
+                    height={150}
+                    className="h-32 w-full object-cover rounded-lg"
+                    loader={({ src }) => src}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeImage(index, false)}
+                    className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+
+              {/* Botón para agregar más imágenes */}
+              <label className="flex flex-col items-center justify-center h-32 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-blue-500">
+                <FiPlus className="text-gray-400 text-2xl mb-2" />
+                <span className="text-sm text-gray-500">Agregar imágenes</span>
+                <input
+                  type="file"
+                  multiple
+                  onChange={handleImageChange}
+                  className="hidden"
+                  accept="image/*"
+                />
+              </label>
+            </div>
+
+            <div className="flex justify-end gap-4">
+              <button
+                onClick={() => setIsImageModalOpen(false)}
+                className="px-4 py-2 bg-gray-300 rounded-lg hover:bg-gray-400 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={saveImages}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                disabled={editingImages.existingImages.length === 0 && editingImages.imagenes.length === 0}
+              >
+                Guardar Cambios
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

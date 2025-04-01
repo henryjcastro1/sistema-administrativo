@@ -6,6 +6,7 @@ import HamburgerMenu from "app/components/menuLogout/HamburgerMenu";
 import ProtectedRoute from "app/components/ProtectedRoute/ProtectedRoute";
 import FormProductos from "app/components/productos/formproductos";
 import Tablaproducts from "app/components/productos/tablaproductos";
+import SubidaProductos from "app/components/SubidaProductos/SubidaProductos";
 
 
 
@@ -27,6 +28,10 @@ const CatalogoProductos = () => {
 
           {/* Formulario de productos */}
           <FormProductos />
+          
+          <SubidaProductos />
+          
+
           <Tablaproducts />
 
           
