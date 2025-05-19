@@ -96,8 +96,12 @@ const FormUsuario = () => {
             setEmailError("El correo electrónico ya está registrado.");
           } else {
             setSubmitStatus("error");
-            console.error("Error:", error.message);
-          }
+            if (typeof error === "object" && error !== null && "message" in error) {
+              console.error("Error:", (error as { message: string }).message);
+            } else {
+              console.error("Error desconocido:", error);
+            }
+                      }
         }
       } catch (error) {
         setSubmitStatus("error");

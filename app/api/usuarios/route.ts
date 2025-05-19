@@ -39,8 +39,8 @@ export async function GET(request: Request) {
 // Crear un usuario (POST)
 export async function POST(request: Request) {
   try {
-    const { nombre, apellido, email, contraseña, telefono, tipo, activo } = await request.json();
-
+    const { nombre, apellido, email, contrasena, telefono, tipo, activo } = await request.json();
+    
     // Verificar si el usuario ya existe
     const usuarioExistente = await prisma.usuario.findUnique({
       where: { email },
@@ -54,7 +54,7 @@ export async function POST(request: Request) {
     }
 
     // Hashear la contraseña antes de guardarla
-    const hashedPassword = await bcrypt.hash(contraseña, 10);
+    const hashedPassword = await bcrypt.hash(contrasena, 10);
 
     // Crear el nuevo usuario con la contraseña hasheada
     const nuevoUsuario = await prisma.usuario.create({
@@ -126,3 +126,4 @@ export async function DELETE(request: Request) {
     );
   }
 }
+
